@@ -1,0 +1,119 @@
+group 'com.infinera.metro.networkmanager.tools'
+version '1.0'
+
+ext.junitVintageVersion = '4.12.2'
+ext.junitPlatformVersion = '1.0.2'
+ext.junitJupiterVersion = '5.0.2'
+ext.lombokVersion = '1.16.18'
+ext.slf4jVersion = '1.2.3'
+ext.logbackVersion = '1.2.3'
+ext.dockerComposeRuleVersion = "0.33.0"
+ext.guavaRetryerVersion = "2.0.0"
+ext.dockerClientVersion = "8.9.2"
+ext.guavaVersion = "23.0"
+
+buildscript {
+    repositories {
+        mavenCentral()
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:4.5.4"
+        classpath "org.junit.platform:junit-platform-gradle-plugin:1.0.2"
+    }
+}
+
+
+
+apply plugin: 'idea'
+apply plugin: 'maven-publish'
+apply plugin: "com.jfrog.artifactory"
+apply plugin: 'org.junit.platform.gradle.plugin'
+
+apply plugin: 'java'
+compileJava {
+    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+    options.encoding = 'UTF-8'
+}
+
+/** Artifactory settings **/
+if (project.hasProperty('partOfLatestCommitHash')) {
+    project.version = project.version + "." + project.partOfLatestCommitHash
+}
+artifactory {
+    contextUrl = "${artifactory_contextUrl}"
+    //The base Artifactory URL if not overridden by the publisher/resolver
+    publish {
+        repository {
+            repoKey = "libs-local"
+            username = "${artifactory_user}"
+            password = "${artifactory_password}"
+            maven = true
+        }
+        defaults {
+            publications('impl')
+        }
+    }
+}
+publishing {
+    publications {
+        impl(MavenPublication) {
+            groupId project.group
+            artifactId project.name
+            version project.version
+            from components.java
+        }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
+
+test {
+    testLogging {
+        showStandardStreams = true
+        events 'started', 'passed'
+    }
+}
+
+repositories {
+    jcenter()
+    mavenCentral()
+    maven {
+        url 'https://dl.bintray.com/palantir/releases' // docker-compose-rule is published on bintray
+    }
+
+    maven {
+        url "https://se-artif-prd.infinera.com/artifactory/repo"
+        credentials {
+            username = "tnmbuild"
+            password = "APGLa2kNd3Da4vLTKo6uWuMcdH"
+        }
+    }
+}
+
+dependencies {
+    compile "org.slf4j:slf4j-api:${slf4jVersion}"
+    compile "ch.qos.logback:logback-classic:${logbackVersion}"
+    compile "com.google.guava:guava:${guavaVersion}"
+    compile "org.projectlombok:lombok:${lombokVersion}"
+    compile "com.palantir.docker.compose:docker-compose-rule-junit4:${dockerComposeRuleVersion}"
+    compile "com.spotify:docker-client:${dockerClientVersion}"
+    compile "com.github.rholder:guava-retrying:${guavaRetryerVersion}"
+    
+    testCompile "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+    testRuntime "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
+    testCompileOnly "org.apiguardian:apiguardian-api:1.0.0"
+    testCompile "org.junit.platform:junit-platform-suite-api:${junitPlatformVersion}"
+    testCompile "org.junit.platform:junit-platform-runner:${junitPlatformVersion}"
+    testCompile "org.junit.platform:junit-platform-console-standalone:${junitPlatformVersion}"
+}
